@@ -14,7 +14,7 @@ contract SKPSwapper {
     address public immutable token;
 
     // Fees
-    uint256 public _fee;
+    uint256 public _fee = 8;
     address public burnFund;
     address public NFTAddr;
 
@@ -29,14 +29,13 @@ contract SKPSwapper {
         _;
     }
 
-    constructor(address _token, address burnFund_, address NFTAddr_) {
-        token = _token;
+    constructor(address token_, address burnFund_, address NFTAddr_) {
         path = new address[](2);
         path[0] = router.WETH();
-        path[1] = _token;
+        path[1] = token_;
+        token = token_;
         burnFund = burnFund_;
         NFTAddr = NFTAddr_;
-        _fee = 8;
     }
     function setFee(uint fee) external onlyOwner {
         _fee = fee;
