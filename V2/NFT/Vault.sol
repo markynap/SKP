@@ -203,20 +203,21 @@ contract Vault is IERC721Receiver {
     ISKP public SKP;
 
     // SKP NFT
-    ISKPNFT public immutable SKPNFT;
+    ISKPNFT public SKPNFT;
 
     // 1 NFT < == > x Tokens
     uint256 public constant conversionRate = 20_000 * 10**18;
-
-    // Initialize NFT
-    constructor(address NFT) {
-        SKPNFT = ISKPNFT(NFT);
-    }
 
     function initializeSKP(address SKP_) external {
         require(SKP_ != address(0), 'Invalid Param');
         require(address(SKP) == address(0), 'Already Initialized');
         SKP = ISKP(SKP_);
+    }
+
+    function initializeSKPNFT(address SKPNFT_) external {
+        require(SKPNFT_ != address(0), 'Invalid Param');
+        require(address(SKPNFT) == address(0), 'Already Initialized');
+        SKPNFT = ISKPNFT(SKPNFT_);
     }
 
     function convertNFTToERC(uint256 tokenID) external {

@@ -574,6 +574,9 @@ contract SKPNFT is Context, ERC165, IERC721, IERC721Metadata, ReentrancyGuard {
     // Mapping from owner to excluded rewards
     mapping(address => uint256) totalExcluded;
 
+    // VAULT Address
+    address public immutable VAULT;
+
     // total dividends for tracking
     uint256 private dividendsPerNFT;
 
@@ -586,7 +589,7 @@ contract SKPNFT is Context, ERC165, IERC721, IERC721Metadata, ReentrancyGuard {
     /**
      * @dev Initializes the contract by setting a `name` and a `symbol` to the token collection.
      */
-    constructor(address initialMintRecipient) {
+    constructor(address initialMintRecipient, address VAULT_) {
 
         // token stats
         _name = 'First Skeptics';
@@ -601,6 +604,9 @@ contract SKPNFT is Context, ERC165, IERC721, IERC721Metadata, ReentrancyGuard {
             _owners[i] = initialMintRecipient;
             emit Transfer(address(0), initialMintRecipient, i);
         }
+
+        // set Vault Address
+        VAULT = VAULT_;
     }
 
     function claimRewards() external nonReentrant {
@@ -618,8 +624,13 @@ contract SKPNFT is Context, ERC165, IERC721, IERC721Metadata, ReentrancyGuard {
     }
 
     receive() external payable {
-        dividendsPerNFT = dividendsPerNFT.add(msg.value.mul(PRECISION).div(_totalSupply));
-        totalRewards += msg.value;
+        uint tSupply = circulatingSupply();
+        if (tSupply > 0) {
+            dividendsPerNFT = dividendsPerNFT.add(msg.value.mul(PRECISION).div(tSupply));
+            totalRewards += msg.value;
+        }
+        // exclude Vault from rewards
+        totalExcluded[VAULT] = getCumulativeDividends(_balances[VAULT]);
     }
 
     /**
@@ -817,6 +828,12 @@ contract SKPNFT is Context, ERC165, IERC721, IERC721Metadata, ReentrancyGuard {
     }
 
     /**
+        Calculates Supply Not Held Within Vault
+     */
+    function circulatingSupply() public view returns (uint256) {
+        return _totalSupply - _balances[VAULT];
+    }
+    /**
      * @dev Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients
      * are aware of the ERC721 protocol to prevent tokens from being forever locked.
      *
@@ -900,7 +917,7 @@ contract SKPNFT is Context, ERC165, IERC721, IERC721Metadata, ReentrancyGuard {
         }
 
         // Allocate balances
-        _balances[from] = _balances[from].sub(1);
+        _balances[from] -= 1;
         _balances[to] += 1;
         _owners[tokenId] = to;
 
@@ -919,6 +936,12 @@ contract SKPNFT is Context, ERC165, IERC721, IERC721Metadata, ReentrancyGuard {
 
         // return if zero balance
         if (_balances[user] == 0) {
+            return;
+        }
+
+        // if user is vault
+        if (user == VAULT) {
+            totalExcluded[user] = getCumulativeDividends(_balances[user]);
             return;
         }
 
