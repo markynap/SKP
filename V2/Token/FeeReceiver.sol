@@ -15,7 +15,7 @@ contract FeeReceiver {
     address public immutable token;
 
     // router
-    IUniswapV2Router02 router = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+    IUniswapV2Router02 router;
 
     // Recipients Of Fees
     address public burnFund;
@@ -51,7 +51,7 @@ contract FeeReceiver {
         _;
     }
 
-    constructor(address token_, address burnFund_, address NFTAddr_) {
+    constructor(address token_, address burnFund_, address NFTAddr_, address router_) {
         require(
             token_ != address(0) &&
             burnFund_ != address(0) &&
@@ -63,6 +63,7 @@ contract FeeReceiver {
         token = token_;
         burnFund = burnFund_;
         NFTAddr = NFTAddr_;
+        router = IUniswapV2Router02(router_);
 
         // Sell Path
         path = new address[](2);

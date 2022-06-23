@@ -267,6 +267,7 @@ interface ISKP is IERC20 {
 
 interface ISKPNFT is IERC721 {
     function getIDsByOwner(address owner) external view returns (uint256[] memory);
+    function onReceivedRetval() external view returns (bytes4);
 }
 
 /**
@@ -401,8 +402,8 @@ contract Vault is IERC721Receiver {
         address,
         uint256,
         bytes calldata
-    ) external returns (bytes4) {
-        return IERC721.onERC721Received.selector;
+    ) external view returns (bytes4) {
+        return SKPNFT.onReceivedRetval();
     }
 
 

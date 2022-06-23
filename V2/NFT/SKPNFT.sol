@@ -758,9 +758,9 @@ contract SKPNFT is Context, ERC165, IERC721, IERC721Metadata, ReentrancyGuard {
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_exists(tokenId), "nonexistent token");
 
-        string memory baseURI = "https://gateway.pinata.cloud/ipfs/QmQQSVjB5rvrKFRrZuJVXs1D3QAasz7bPQjst4mRcBzrJB/FS-";
+        string memory baseURI = "https://gateway.pinata.cloud/ipfs/QmVyunjVbYeP8Ry8ALVvPa2irZZXr31DWko5dYGnXUsAXb/FS-";
         string memory ending = ".png";
-        string memory middle = uint2str(tokenId+1);
+        string memory middle = uint2str(tokenId);
         string memory fHalf = string.concat(baseURI, middle);
         return string.concat(fHalf, ending);
     }
