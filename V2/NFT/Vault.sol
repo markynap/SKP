@@ -283,7 +283,7 @@ contract Vault is IERC721Receiver {
     ISKPNFT public SKPNFT;
 
     // 1 NFT < == > x Tokens
-    uint256 public constant conversionRate = 20_000 * 10**18;
+    uint256 public constant conversionRate = 200_000 * 10**18;
 
     function initializeSKP(address SKP_) external {
         require(SKP_ != address(0), 'Invalid Param');
