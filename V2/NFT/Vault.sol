@@ -298,22 +298,18 @@ contract Vault is IERC721Receiver {
     }
 
     function convertNFTToERC(uint256 tokenID) external {
-        require(
-            SKPNFT.ownerOf(tokenID) == msg.sender,
-            'Sender Must Be NFT Owner'
-        );
+        _convertNFTToERC(tokenID);
+    }
 
-        // transfer from sender to this
-        SKPNFT.safeTransferFrom(msg.sender, address(this), tokenID);
-
-        // ensure transfer was successful
-        require(
-            SKPNFT.ownerOf(tokenID) == address(this),
-            'Did Not Receive NFT'
-        );
-
-        // mint sender SKP Tokens 
-        SKP.mint(msg.sender, conversionRate);
+    function convertBatchNFTToERC(uint256[] calldata tokenIDs) external {
+        uint len = tokenIDs.length;
+        require(len > 0, 'Zero Length');
+        for (uint i = 0; i < len;) {
+            _convertNFTToERC(tokenIDs[i]);
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function convertERCToNFT() external {
@@ -378,6 +374,26 @@ contract Vault is IERC721Receiver {
 
         // send NFT to msg.sender
         SKPNFT.safeTransferFrom(address(this), msg.sender, idToSend);
+    }
+
+    function _convertNFTToERC(uint256 tokenID) internal {
+
+        require(
+            SKPNFT.ownerOf(tokenID) == msg.sender,
+            'Sender Must Be NFT Owner'
+        );
+
+        // transfer from sender to this
+        SKPNFT.safeTransferFrom(msg.sender, address(this), tokenID);
+
+        // ensure transfer was successful
+        require(
+            SKPNFT.ownerOf(tokenID) == address(this),
+            'Did Not Receive NFT'
+        );
+
+        // mint sender SKP Tokens 
+        SKP.mint(msg.sender, conversionRate);
     }
 
     /**

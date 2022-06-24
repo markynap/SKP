@@ -4,133 +4,100 @@ pragma solidity 0.8.14;
 import "./IERC20.sol";
 import "./IUniswapV2Router02.sol";
 
-interface IOwnableToken {
+interface IOwnedContract {
     function getOwner() external view returns (address);
     function burn(uint256 amount) external;
 }
 
 contract FeeReceiver {
 
-    // token
-    address public immutable token;
-
-    // router
-    IUniswapV2Router02 router;
+    // Token
+    IERC20 public immutable token;
 
     // Recipients Of Fees
-    address public burnFund;
-    address public NFTAddr;
+    address public NFT;
+    address public SKPFund;
+
+    // Fee Percentages
+    uint256 public NFTPercent         = 50;
+    uint256 public skepticFundPercent = 50;
+    uint256 public bountyPercent      = 2;
+
+    // router
+    IUniswapV2Router02 router = IUniswapV2Router02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
 
     // Token -> BNB
     address[] path;
 
-    /**
-        Minimum Amount Of SKP In Contract To Trigger `trigger` Unless `approved`
-            If Set To A Very High Number, Only Approved May Call Trigger Function
-            If Set To A Very Low Number, Anybody May Call At Their Leasure
-     */
-    uint256 public minimumTokensRequiredToTrigger;
-
-    // Burn Fund Allocation
-    uint256 public burnFundPercentage;
-
-    // Percentage of tokens to burn before selling
-    uint256 public burnPercentage;
-
-    // Address => Can Call Trigger
-    mapping ( address => bool ) public approved;
-
-    // Events
-    event Approved(address caller, bool isApproved);
-
     modifier onlyOwner(){
         require(
-            msg.sender == IOwnableToken(token).getOwner(),
-            'Only Owner'
+            msg.sender == IOwnedContract(address(token)).getOwner(),
+            'Only Token Owner'
         );
         _;
     }
 
-    constructor(address token_, address burnFund_, address NFTAddr_, address router_) {
-        require(
-            token_ != address(0) &&
-            burnFund_ != address(0) &&
-            NFTAddr_ != address(0),
-            'Zero Address'
-        );
-
-        // Initialize Addresses
-        token = token_;
-        burnFund = burnFund_;
-        NFTAddr = NFTAddr_;
-        router = IUniswapV2Router02(router_);
+    constructor(address token_, address NFT_, address SKPFund_) {
+        token = IERC20(token_);
+        NFT = NFT_;
+        SKPFund = SKPFund_;
 
         // Sell Path
         path = new address[](2);
         path[0] = token_;
         path[1] = router.WETH();
 
-        // set initial approved
-        approved[msg.sender] = true;
-
-        // tax percentages
-        burnPercentage = 10;
-        burnFundPercentage = 65;
-
-        // only approved can trigger at the start
-        minimumTokensRequiredToTrigger = 10**30;
     }
 
     function trigger() external {
 
+        // Bounty Reward For Triggerer
+        uint bounty = currentBounty();
+        if (bounty > 0) {
+            token.transfer(msg.sender, bounty);
+        }
+
         // Token Balance In Contract
-        uint balance = IERC20(token).balanceOf(address(this));
+        uint balance = token.balanceOf(address(this));
 
-        if (balance < minimumTokensRequiredToTrigger && !approved[msg.sender]) {
-            return;
-        }
-        
-        uint toBurn = balance * burnPercentage / 100;
-        if (toBurn > 0) {
-            IOwnableToken(token).burn(toBurn);
-        }
-        balance -= toBurn;
-        // sell Tokens in contract for BNB
-        IERC20(token).approve(address(router), balance);
-        router.swapExactTokensForETHSupportingFeeOnTransferTokens(balance, 0, path, address(this), block.timestamp + 300);
+        if (balance > 0) {
+            
+            // Sell Tokens For BNB
+            IERC20(token).approve(address(router), balance);
+            router.swapExactTokensForETHSupportingFeeOnTransferTokens(balance, 0, path, address(this), block.timestamp + 300);
 
-        if (address(this).balance > 0) {
-            // fraction out bnb received
-            uint part1 = address(this).balance * burnFundPercentage / 100;
-            uint part2 = address(this).balance - part1;
-
-            // send to destinations
-            _send(burnFund, part1);
-            _send(NFTAddr, part2);
+            // send NFT rewards
+            _send(NFT, address(this).balance * NFTPercent / 100);
+            
+            // send Fund Rewards
+            _send(SKPFund, address(this).balance);
+            
         }
     }
 
-    function setBurnFund(address tFund) external onlyOwner {
-        require(tFund != address(0));
-        burnFund = tFund;
+    function updateFeePercentages(uint fund_, uint nft_) external onlyOwner {
+        require(
+            fund_ + nft_ == 100, 'Invalid Fees'
+        );
+        skepticFundPercent = fund_;
+        NFTPercent = nft_;
     }
-    function setNFTAddr(address NFTAddr_) external onlyOwner {
-        require(NFTAddr_ != address(0));
-        NFTAddr = NFTAddr_;
+
+    function setBountyPercent(uint256 bountyPercent_) external onlyOwner {
+        require(bountyPercent_ < 100);
+        bountyPercent = bountyPercent_;
     }
-    function setApproved(address caller, bool isApproved) external onlyOwner {
-        approved[caller] = isApproved;
-        emit Approved(caller, isApproved);
+
+    function setFund(address fund_) external onlyOwner {
+        require(fund_ != address(0));
+        SKPFund = fund_;
     }
-    function setMinTriggerAmount(uint256 minTriggerAmount) external onlyOwner {
-        minimumTokensRequiredToTrigger = minTriggerAmount;
+    
+    function setNFT(address nft_) external onlyOwner {
+        require(nft_ != address(0));
+        NFT = nft_;
     }
-    function setBurnFundPercentage(uint256 newAllocatiton) external onlyOwner {
-        burnFundPercentage = newAllocatiton;
-    }
-    function setBurnPercentage(uint256 newAllocatiton) external onlyOwner {
-        burnPercentage = newAllocatiton;
-    }
+    
     function withdraw() external onlyOwner {
         (bool s,) = payable(msg.sender).call{value: address(this).balance}("");
         require(s);
@@ -139,9 +106,18 @@ contract FeeReceiver {
     function withdraw(address _token) external onlyOwner {
         IERC20(_token).transfer(msg.sender, IERC20(_token).balanceOf(address(this)));
     }
+
+    function _send(address to, uint val) internal {
+        if (val > 0) {
+            (bool s,) = payable(to).call{value: val}("");
+            require(s);
+        }
+    }
+
     receive() external payable {}
-    function _send(address recipient, uint amount) internal {
-        (bool s,) = payable(recipient).call{value: amount}("");
-        require(s);
+
+    function currentBounty() public view returns (uint256) {
+        uint balance = IERC20(token).balanceOf(address(this));
+        return ((balance * bountyPercent ) / 100);
     }
 }
